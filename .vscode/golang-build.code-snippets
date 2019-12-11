@@ -186,5 +186,101 @@
             ""
         ],
         "description": ""
+    },
+    "110-parameters": {
+        "prefix": "json",
+        "body": [
+            "{\r",
+            "    \"$schema\": \"https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json\",\r",
+            "    \"contentVersion\": \"1.0.0.0\",\r",
+            "    \"parameters\": {\r",
+            "        \"siteName\": {\r",
+            "            \"type\": \"string\"\r",
+            "        },\r",
+            "        \"demoAppImageVersion\": {\r",
+            "            \"type\": \"string\"\r",
+            "        },\r",
+            "        \"servicePlanPricingTier\": {\r",
+            "            \"type\": \"string\",\r",
+            "            \"allowedValues\": [\r",
+            "                \"F1\",\r",
+            "                \"B1\",\r",
+            "                \"S1\"\r",
+            "            ],\r",
+            "            \"defaultValue\": \"F1\"\r",
+            "        },\r",
+            "        \"servicePlanCapacity\": {\r",
+            "            \"type\": \"int\",\r",
+            "            \"defaultValue\": 1,\r",
+            "            \"minValue\": 1,\r",
+            "            \"maxValue\": 3\r",
+            "        },\r",
+            "        \"location\": {\r",
+            "            \"type\": \"string\",\r",
+            "            \"defaultValue\": \"[resourceGroup().location]\"\r",
+            "        }\r",
+            "    },\r",
+            "    \"variables\": {\r",
+            "    },\r",
+            "    \"resources\": [\r",
+            "    ]\r",
+            "}\r",
+            ""
+        ],
+        "description": ""
+    },
+    "120-variables": {
+        "prefix": "json",
+        "body": [
+            "        \"imageName\": \"rstropek/demo\",\r",
+            "        \"servicePlanName\": \"[concat(parameters('siteName'), '-asp')]\"\r",
+            ""
+        ],
+        "description": ""
+    },
+    "130-serverfarm": {
+        "prefix": "json",
+        "body": [
+            "        {\r",
+            "            \"type\": \"Microsoft.Web/serverfarms\",\r",
+            "            \"apiVersion\": \"2018-02-01\",\r",
+            "            \"name\": \"[variables('servicePlanName')]\",\r",
+            "            \"location\": \"[parameters('location')]\",\r",
+            "            \"properties\": {\r",
+            "                \"name\": \"[variables('servicePlanName')]\",\r",
+            "                \"workerSizeId\": \"1\",\r",
+            "                \"reserved\": true,\r",
+            "                \"numberOfWorkers\": \"1\"\r",
+            "            },\r",
+            "            \"sku\": {\r",
+            "                \"name\": \"[parameters('servicePlanPricingTier')]\",\r",
+            "                \"capacity\": \"[parameters('servicePlanCapacity')]\"\r",
+            "            },\r",
+            "            \"kind\": \"linux\"\r",
+            "        },"
+        ],
+        "description": ""
+    },
+    "140-website": {
+        "prefix": "json",
+        "body": [
+            "{\r",
+            "            \"type\": \"Microsoft.Web/sites\",\r",
+            "            \"apiVersion\": \"2018-02-01\",\r",
+            "            \"name\": \"[parameters('siteName')]\",\r",
+            "            \"location\": \"[parameters('location')]\",\r",
+            "            \"dependsOn\": [\r",
+            "                \"[variables('servicePlanName')]\"\r",
+            "            ],\r",
+            "            \"properties\": {\r",
+            "                \"siteConfig\": {\r",
+            "                    \"linuxFxVersion\": \"[concat('DOCKER|',variables('imageName'),':',parameters('demoAppImageVersion'))]\"\r",
+            "                },\r",
+            "                \"name\": \"[parameters('siteName')]\",\r",
+            "                \"serverFarmId\": \"[variables('servicePlanName')]\"\r",
+            "            }\r",
+            "        }"
+        ],
+        "description": ""
     }
 }
