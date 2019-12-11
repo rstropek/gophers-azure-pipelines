@@ -15,5 +15,5 @@ func TestNext(t *testing.T) {
 	iter.Next()
 	assert.Equal(t, int32(1), iter.Value())
 	iter.Next()
-	assert.Equal(t, int32(42), iter.Value())
+	assert.Equal(t, int32(1), iter.Value())
 }
