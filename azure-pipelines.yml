@@ -101,3 +101,31 @@ stages:
         tags: |
           latest
           $(Build.BuildId)
+
+- stage: PublishToAzure
+  displayName: 'Publish App to Azure'
+  jobs:
+  - job: PublishToAzure
+    displayName: 'Publish App to Azure'
+    pool:
+      vmImage: 'Ubuntu 18.04'
+    steps:
+    - task: AzureResourceGroupDeployment@2
+      inputs:
+        azureSubscription: 'Azure'
+        action: 'Create Or Update Resource Group'
+        resourceGroupName: 'gophers-meetup-linz'
+        location: 'westeurope'
+        templateLocation: 'Linked artifact'
+        csmFile: 'azuredeploy.json'
+        overrideParameters: '-siteName gophers-meetup-app -demoAppImageVersion $(Build.BuildId)'
+        deploymentMode: 'Incremental'
+      displayName: 'Create or Update Azure Resource Group'
+
+    - script: |
+        curl --fail --max-time 15 https://gophers-meetup-app.azurewebsites.net/fib 2>&1
+        if [ $? -ne 0 ]; then
+          >&2 echo "Website not reachable"
+        fi
+      displayName: 'Try deployed web service'
+      failOnStderr: true
