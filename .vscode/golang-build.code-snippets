@@ -1,0 +1,190 @@
+{
+    "10-trigger": {
+        "prefix": "yml",
+        "body": [
+            "trigger:\r",
+            "- master\r",
+            ""
+        ],
+        "description": ""
+    },
+	"20-build-test-stage": {
+        "prefix": "yml",
+        "body": [
+            "stages:\r",
+            "- stage: 'BuildTest'\r",
+            "  displayName: 'Build and Test'\r",
+            "  variables:\r",
+            "    GOVERSION: '1.13.5'   # Version of Go tools used for building and testing\r",
+            "    CGO_ENABLED: '0'      # Disable cgo to get a static binary\r",
+            "    GOOS: 'linux'\r",
+            "    GOARCH: 'amd64'\r",
+            "  jobs:\r",
+            "  - job: BuildTestBackend\r",
+            "    displayName: 'Build and Test Go Backend'\r",
+            "    pool:\r",
+            "      vmImage: 'Ubuntu 18.04'\r",
+            ""
+        ],
+        "description": ""
+    },
+	"30-go-version": {
+        "prefix": "yml",
+        "body": [
+            "    steps:\r",
+            "    - task: GoTool@0\r",
+            "      inputs:\r",
+            "        version: $(GOVERSION)\r",
+            "      displayName: 'Install and select Go version $(GOVERSION)'\r",
+            ""
+        ],
+        "description": ""
+    },
+	"40-run-tests": {
+        "prefix": "yml",
+        "body": [
+            "    - script: |\r",
+            "        # Get tools for converting Go's test reports\r",
+            "        go get -u github.com/jstemmer/go-junit-report 2>&1\r",
+            "        go get -u github.com/axw/gocov/gocov 2>&1\r",
+            "        go get -u github.com/AlekSi/gocov-xml 2>&1\r",
+            "\r",
+            "        # Run Go tests and turn output into JUnit test result format\r",
+            "        go test ./mathalgorithms -v -coverprofile=demo-coverage.txt -covermode count 2>&1 | $HOME/go/bin/go-junit-report > demo-report.xml\r",
+            "        rc=${PIPESTATUS[0]} # Get result code of `go test`\r",
+            "\r",
+            "        # Convert coverage file into XML\r",
+            "        $HOME/go/bin/gocov convert demo-coverage.txt > demo-coverage.json\r",
+            "        $HOME/go/bin/gocov-xml < demo-coverage.json > demo-coverage.xml\r",
+            "\r",
+            "        # Check if `go test` had an error\r",
+            "        if [ $rc -ne 0 ]; then\r",
+            "          # Let script fail by writing to stderr\r",
+            "          >&2 echo \"Tests failed\"\r",
+            "        fi\r",
+            "      displayName: 'Run unit tests and convert results'\r",
+            "      failOnStderr: true"
+        ],
+        "description": ""
+    },
+	"50-go-build": {
+        "prefix": "yml",
+        "body": [
+            "    - task: Go@0\r",
+            "      inputs:\r",
+            "        command: 'build'\r",
+            "        arguments: '-a -o demo'\r",
+            "      displayName: 'Build Go app'\r",
+            ""
+        ],
+        "description": ""
+    },
+	"60-publish-results": {
+        "prefix": "yml",
+        "body": [
+            "    - publish: '$(Build.SourcesDirectory)/demo'\r",
+            "      artifact: 'Executable'\r",
+            "      displayName: 'Publish pipeline artifact'\r",
+            "\r",
+            "    - task: PublishTestResults@2\r",
+            "      condition: always()\r",
+            "      inputs:\r",
+            "        testResultsFormat: 'JUnit'\r",
+            "        testResultsFiles: '*report*.xml' \r",
+            "        searchFolder: '$(Build.SourcesDirectory)'\r",
+            "      displayName: 'Publish test results'\r",
+            "\r",
+            "    - task: PublishCodeCoverageResults@1\r",
+            "      condition: always()\r",
+            "      inputs:\r",
+            "        codeCoverageTool: 'Cobertura'\r",
+            "        summaryFileLocation: '$(Build.SourcesDirectory)/demo-coverage.xml'\r",
+            "      displayName: 'Publish code coverage results'"
+        ],
+        "description": ""
+    },
+	"70-publish-docker-prepare": {
+        "prefix": "yml",
+        "body": [
+            "- stage: PublishImage\r",
+            "  displayName: 'Publish Docker Image'\r",
+            "  jobs:\r",
+            "  - job: PublishImage\r",
+            "    displayName: 'Publish Docker Image'\r",
+            "    pool:\r",
+            "      vmImage: 'Ubuntu 18.04'\r",
+            "    steps:\r",
+            "    - download: current\r",
+            "      artifact: Executable\r",
+            "      displayName: 'Download pipeline artifact'\r",
+            "\r",
+            "    - task: CopyFiles@2\r",
+            "      inputs:\r",
+            "        sourceFolder: '$(Agent.BuildDirectory)/Executable'\r",
+            "        CleanTargetFolder: false\r",
+            "        Contents: demo\r",
+            "        TargetFolder: '$(Build.SourcesDirectory)'\r",
+            "      displayName: 'Copy executable to folder with Dockerfile'"
+        ],
+        "description": ""
+    },
+	"80-login-build-push": {
+        "prefix": "yml",
+        "body": [
+            "    - task: Docker@2\r",
+            "      displayName: 'Login to Docker Hub'\r",
+            "      inputs:\r",
+            "        command: login\r",
+            "        containerRegistry: 'Docker Hub'\r",
+            "\r",
+            "    - task: Docker@2\r",
+            "      displayName: 'Build and Push Image'\r",
+            "      inputs:\r",
+            "        command: buildAndPush\r",
+            "        repository: rstropek/demo\r",
+            "        tags: |\r",
+            "          latest\r",
+            "          $(Build.BuildId)"
+        ],
+        "description": ""
+    },
+	"90-publish-azure": {
+        "prefix": "yml",
+        "body": [
+            "- stage: PublishToAzure\r",
+            "  displayName: 'Publish App to Azure'\r",
+            "  jobs:\r",
+            "  - job: PublishToAzure\r",
+            "    displayName: 'Publish App to Azure'\r",
+            "    pool:\r",
+            "      vmImage: 'Ubuntu 18.04'\r",
+            "    steps:\r",
+            "    - task: AzureResourceGroupDeployment@2\r",
+            "      inputs:\r",
+            "        azureSubscription: 'Azure'\r",
+            "        action: 'Create Or Update Resource Group'\r",
+            "        resourceGroupName: 'gophers-meetup-linz'\r",
+            "        location: 'westeurope'\r",
+            "        templateLocation: 'Linked artifact'\r",
+            "        csmFile: 'azuredeploy.json'\r",
+            "        overrideParameters: '-siteName gophers-meetup-app -demoAppImageVersion $(Build.BuildId)'\r",
+            "        deploymentMode: 'Incremental'\r",
+            "      displayName: 'Create or Update Azure Resource Group'"
+        ],
+        "description": ""
+    },
+	"95-warmup-web-app": {
+        "prefix": "yml",
+        "body": [
+            "    - script: |\r",
+            "        curl --fail --max-time 15 https://gophers-meetup-app.azurewebsites.net/fib 2>&1\r",
+            "        if [ $? -ne 0 ]; then\r",
+            "          >&2 echo \"Website not reachable\"\r",
+            "        fi\r",
+            "      displayName: 'Try deployed web service'\r",
+            "      failOnStderr: true\r",
+            ""
+        ],
+        "description": ""
+    }
+}
